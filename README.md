@@ -47,18 +47,6 @@ From the repository root:
 blender --command extension build
 ```
 
-## Tests
-
-The scripts in `tests/` drive a real Blender. Run them from the folder that
-*contains* this repository (cloned as `guidebro`), and point
-`BLENDER_USER_RESOURCES` at a throwaway folder so the test Blender cannot touch
-your own extensions. For example:
-
-```
-blender -b --factory-startup --python guidebro/tests/test_data.py -- .
-blender --factory-startup --enable-event-simulate --python guidebro/tests/test_gui.py -- . out
-```
-
 ## License
 
 GPL-3.0-or-later. See [LICENSE](LICENSE).

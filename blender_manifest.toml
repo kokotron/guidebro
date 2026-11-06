@@ -17,13 +17,12 @@ license = [
   "SPDX:GPL-3.0-or-later",
 ]
 
-# Only the add-on goes into the built zip: no tests or repository files.
+# Only the add-on goes into the built zip: no repository files.
 [build]
 paths_exclude_pattern = [
   "__pycache__/",
   "/.git/",
   "/.gitignore",
   "/.github/",
-  "/tests/",
   "/*.zip",
 ]

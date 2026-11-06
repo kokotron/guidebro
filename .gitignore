@@ -1,5 +1,3 @@
 __pycache__/
 *.pyc
 *.zip
-tests/out/
-tests/userres/

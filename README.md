@@ -48,6 +48,8 @@ From the repository root:
 ```
 blender --command extension build
 ```
+## Special thanks
+Special thanks to @sotoszogos for testing and feedback
 
 ## License
 

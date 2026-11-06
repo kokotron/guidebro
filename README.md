@@ -19,6 +19,8 @@ to the 3D View sidebar (N panel).
   are editable as numbers.
 - **Snapping while dragging guides:** to the frame grid, object origins, on-screen
   bounds or mesh vertices (toggles in the Snapping panel, or hold Ctrl).
+- **Rulers:** Photoshop-style rulers in camera view, in render pixels. Drag out of
+  the top ruler for a horizontal guide, out of the left one for a vertical guide.
 - **Frame grid:** optional visible grid, with square (1:1) cells if you like.
 - **Objects snap to guides:** while you move objects with Blender's own Move (G, the
   Move tool or its gizmo), their origin, bounds or vertices snap to nearby guides.

@@ -15,6 +15,7 @@ from .common import (
     get_view_region, is_camera_view, mouse_over_viewport, norm_rel, norm_to_pixel,
     region_mouse_coords, screen_to_plane, tag_redraw_3d_views, wrap_pi,
 )
+from . import rulers
 from .ops import add_3d_guide
 from .screen import (
     constrain_line_point, ensure_group, frame_grid, get_current_group, get_current_guides,
@@ -135,7 +136,9 @@ def pick3_at(context, mx, my):
 
 def pick_any(context, mx, my):
     """2D and 3D guides together: -> (space, kind, index) or None.
-    Handles beat lines; among lines the nearest wins."""
+    Handles beat lines; among lines the nearest wins. Nothing on the rulers."""
+    if rulers.ruler_hit(context, mx, my) is not None:
+        return None
     cands = []
     hit = pick_at(context, mx, my)
     if hit is not None:

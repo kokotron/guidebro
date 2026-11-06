@@ -1,6 +1,15 @@
 # GuideBro - Photoshop-style 2D and 3D guides for Blender's camera and viewport.
 #
 # ------------------------------------------------------------
+#  v0.6.0
+#  - Rulers in camera view (toggle under Edit Guides / Hide Guides), in
+#    render pixels, with marks where the 2D guides are. Drag out of the top
+#    ruler for a horizontal guide, out of the left one for a vertical guide;
+#    release over a ruler to discard it.
+#  - Sidebar: each section's content sits in a box, and sections start
+#    closed. 3D guides: Point A / Point B as a title over one X Y Z row; the
+#    Direction field is gone (Heading / Pitch / Align to remain).
+#
 #  v0.5.4
 #  - Objects snap to guides now also works in Edit Mode: with Vertex on,
 #    the selected vertices you move (G / Move tool / gizmo) snap to 2D and
@@ -46,6 +55,7 @@
 #      ops.py        operators
 #      edit_mode.py  Edit Guides and Guide from Edge
 #      two_points.py Guide through two points
+#      rulers.py     Rulers in camera view (and dragging guides out of them)
 #      draw.py       viewport drawing
 #      ui.py         sidebar ("GuideBro" tab)
 #  - 2D guide groups live in one library per scene. Each camera (and the

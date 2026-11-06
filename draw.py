@@ -18,7 +18,7 @@ from .screen import (
     handle_positions,
 )
 from .world import guide3_handles, guide3_info, view_projection
-from . import objsnap
+from . import objsnap, rulers
 
 
 FONT_ID = 0
@@ -320,12 +320,17 @@ def draw_guides():
 
     # Universal hide toggle hides the guides (feedback overlays still show).
     if not settings.guides_hidden and bounds is not None:
-        view = visible_rect(context)
+        view = rulers.view_rect_without_rulers(context, visible_rect(context))
         label_rect = intersect_rects(bounds, view) if view is not None else bounds
         if settings.grid_show:
             draw_grid(context, settings, bounds, shader)
         draw_guides2d(context, settings, bounds, label_rect, shader, edit_here, fx_here)
         draw_guides3d(context, settings, bounds, label_rect, shader, edit_here, fx_here)
+
+    if bounds is not None:
+        group = get_current_group(settings, context)
+        rulers.draw_rulers(context, settings, shader, _draw_prim,
+                           None if settings.guides_hidden or group is None else group.guides)
 
     if fx_here and bounds is not None:
         draw_fx(shader)

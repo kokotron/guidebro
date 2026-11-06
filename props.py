@@ -400,6 +400,15 @@ class GuideBroSettings(bpy.types.PropertyGroup):
         update=guide_update_callback,
     )
 
+    show_rulers: bpy.props.BoolProperty(
+        name="Rulers",
+        description="Show rulers (render pixels) along the top and left of the camera view. "
+                    "Drag out of a ruler to make a guide: from the top for a horizontal one, "
+                    "from the left for a vertical one",
+        default=True,
+        update=_obj_snap_update,           # (re)starts the listener that catches ruler drags
+    )
+
     guides_hidden: bpy.props.BoolProperty(
         name="Hide All Guides",
         description="Temporarily hide every guide, 2D and 3D, in every view",

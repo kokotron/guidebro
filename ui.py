@@ -140,22 +140,25 @@ class GuideBroPanel:
     bl_category = "GuideBro"
 
     def draw(self, context):
+        # Sections draw their content in a box: a subtle background (from
+        # the theme) that sets each section apart.
+        layout = self.layout.box() if getattr(self, "bl_parent_id", "") else self.layout
         try:
-            self._draw_inner(context)
+            self._draw_inner(context, layout)
         except Exception as e:
-            self.layout.label(text=f"Error: {e}", icon='ERROR')
+            layout.label(text=f"Error: {e}", icon='ERROR')
 
 
 class GuideBroSubPanel(GuideBroPanel):
     bl_parent_id = "GUIDEBRO_PT_main"
+    bl_options = {'DEFAULT_CLOSED'}       # sections start collapsed
 
 
 class GUIDEBRO_PT_main(GuideBroPanel, bpy.types.Panel):
     bl_label = "GuideBro"
     bl_idname = "GUIDEBRO_PT_main"
 
-    def _draw_inner(self, context):
-        layout = self.layout
+    def _draw_inner(self, context, layout):
         settings = get_settings(context)
         edit_on = _edit["active"]
 
@@ -168,6 +171,8 @@ class GUIDEBRO_PT_main(GuideBroPanel, bpy.types.Panel):
             icon='HIDE_ON' if settings.guides_hidden else 'HIDE_OFF',
             depress=settings.guides_hidden,
         )
+        layout.prop(settings, "show_rulers", text="Rulers", toggle=True,
+                    icon='CHECKBOX_HLT' if settings.show_rulers else 'CHECKBOX_DEHLT')
 
         dim_x, dim_y = get_pixel_dimensions(context)
         info = layout.row()
@@ -193,8 +198,7 @@ class GUIDEBRO_PT_guides2d(GuideBroSubPanel, bpy.types.Panel):
         if group is not None and len(group.guides):
             self.layout.operator("guidebro.clear", text="", icon='TRASH', emboss=False)
 
-    def _draw_inner(self, context):
-        layout = self.layout
+    def _draw_inner(self, context, layout):
         settings = get_settings(context)
         in_cam = is_camera_view(context)
         camera = context.scene.camera
@@ -293,8 +297,7 @@ class GUIDEBRO_PT_guides3d(GuideBroSubPanel, bpy.types.Panel):
     bl_label = "3D Guides"
     bl_idname = "GUIDEBRO_PT_guides3d"
 
-    def _draw_inner(self, context):
-        layout = self.layout
+    def _draw_inner(self, context, layout):
         settings = get_settings(context)
 
         row = layout.row(align=True)
@@ -325,14 +328,15 @@ class GUIDEBRO_PT_guides3d(GuideBroSubPanel, bpy.types.Panel):
         col.operator("guidebro.guide3d_remove", text="", icon='REMOVE').index = index
 
         guide = guides[index]
+        # Point A / Point B: a title, then X Y Z in one row.
+        for prop, title in (("point", "Point A"), ("point_b", "Point B")):
+            col = layout.column(align=True)
+            col.label(text=title)
+            col.row(align=True).prop(guide, prop, text="")
+
         col = layout.column()
         col.use_property_split = True
         col.use_property_decorate = False
-        col.prop(guide, "point", text="Point A")
-        col.prop(guide, "point_b", text="Point B")
-        col.separator()
-        col.prop(guide, "direction", text="Direction")
-        col.separator()
         col.prop(guide, "heading", text="Heading")
         col.prop(guide, "pitch", text="Pitch")
 
@@ -352,8 +356,7 @@ class GUIDEBRO_PT_snapping(GuideBroSubPanel, bpy.types.Panel):
     bl_label = "Snapping"
     bl_idname = "GUIDEBRO_PT_snapping"
 
-    def _draw_inner(self, context):
-        layout = self.layout
+    def _draw_inner(self, context, layout):
         settings = get_settings(context)
 
         # -- Guides snap to things (Edit Guides) ----------------------
@@ -412,10 +415,8 @@ class GUIDEBRO_PT_snapping(GuideBroSubPanel, bpy.types.Panel):
 class GUIDEBRO_PT_appearance(GuideBroSubPanel, bpy.types.Panel):
     bl_label = "Appearance"
     bl_idname = "GUIDEBRO_PT_appearance"
-    bl_options = {'DEFAULT_CLOSED'}
 
-    def _draw_inner(self, context):
-        layout = self.layout
+    def _draw_inner(self, context, layout):
         layout.use_property_split = True
         layout.use_property_decorate = False
         settings = get_settings(context)

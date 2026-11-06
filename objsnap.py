@@ -15,7 +15,8 @@
 #  * A tiny pass-through modal ("view tracker") remembers which 3D view the
 #    pointer is in, because a depsgraph handler cannot know which view the
 #    move is being made in. Without it the camera view (or the largest view)
-#    is used.
+#    is used. Being a window-level handler, it also sees clicks before the 3D
+#    view does, which is how drags out of the rulers are caught (rulers.py).
 
 import bmesh
 import bpy
@@ -25,9 +26,10 @@ from bpy_extras import view3d_utils
 from mathutils import Vector
 
 from .common import (
-    _fx, fx_reset, get_current_bounds, get_region_3d, get_view_region,
+    MODIFIER_KEYS, _fx, fx_reset, get_current_bounds, get_region_3d, get_view_region,
     screen_to_plane, tag_redraw_3d_views,
 )
+from . import rulers
 from .screen import frame_grid, get_current_group, guide_segment
 from .snapping import bounds_key_points, evaluated_local_coords, snap_move_to_guides
 from .world import bbox_key_points, line3_screen, point_on_line_under_ray, project_points
@@ -102,39 +104,126 @@ def _pick_view(win):
     return best
 
 
+def _tracker_wanted(settings):
+    return settings is not None and (settings.obj_snap or settings.show_rulers)
+
+
 class GUIDEBRO_OT_view_tracker(bpy.types.Operator):
-    """Remembers which 3D view the pointer is over (for object snapping)"""
+    """Remembers which 3D view the pointer is over (for object snapping) and
+    catches drags out of the rulers"""
     bl_idname = "guidebro.view_tracker"
     bl_label = "GuideBro View Tracker"
     bl_options = {'INTERNAL'}
 
     _win = 0
+    _drag = None             # rulers.RulerDrag while a guide is dragged out of a ruler
+    _cursor = None           # cursor we set while hovering a ruler
 
     def invoke(self, context, event):
         win = context.window
         if win is None or win.as_pointer() in _trackers:
             return {'CANCELLED'}
         self._win = win.as_pointer()
+        self._drag = None
+        self._cursor = None
         _trackers.add(self._win)
         context.window_manager.modal_handler_add(self)
         return {'RUNNING_MODAL'}
 
     def modal(self, context, event):
         settings = getattr(context.scene, "guidebro", None)
-        if settings is None or not settings.obj_snap:
+        if self._drag is not None:
+            return self._drag_event(context, event)
+        if not _tracker_wanted(settings):
+            self._set_cursor(context, None)
             _trackers.discard(self._win)
             return {'CANCELLED'}
         if event.type in {'MOUSEMOVE', 'INBETWEEN_MOUSEMOVE'} or event.value == 'PRESS':
-            self._record(context, event.mouse_x, event.mouse_y)
+            view = self._record(context, event.mouse_x, event.mouse_y)
+            side = None
+            if settings.show_rulers and view is not None:
+                area, region = view
+                with context.temp_override(area=area, region=region):
+                    side = rulers.ruler_hit(context, event.mouse_x - region.x,
+                                            event.mouse_y - region.y)
+                    if (side in {'TOP', 'LEFT'} and event.type == 'LEFTMOUSE'
+                            and event.value == 'PRESS'):
+                        return self._start_drag(context, event, side, area, region)
+            self._set_cursor(context, {'TOP': 'MOVE_Y', 'LEFT': 'MOVE_X'}.get(side))
         return {'PASS_THROUGH'}
 
     def cancel(self, context):
+        if self._drag is not None:
+            try:
+                self._with_drag_view(context, lambda r: self._drag.cancel(context))
+            except Exception:
+                pass
+            self._drag = None
         _trackers.discard(self._win)
 
+    # -- ruler drags ---------------------------------------------
+
+    def _set_cursor(self, context, cursor):
+        if cursor == self._cursor:
+            return
+        if cursor is None:
+            context.window.cursor_set('DEFAULT')
+        else:
+            context.window.cursor_set(cursor)
+        self._cursor = cursor
+
+    def _start_drag(self, context, event, side, area, region):
+        try:
+            self._drag = rulers.RulerDrag(context, side)
+            self._drag.update(context, event, event.mouse_x - region.x, event.mouse_y - region.y)
+        except Exception as exc:
+            print(f"GuideBro: ruler drag failed: {exc}")
+            self._drag = None
+            return {'PASS_THROUGH'}
+        context.window.cursor_modal_set('MOVE_Y' if side == 'TOP' else 'MOVE_X')
+        return {'RUNNING_MODAL'}
+
+    def _with_drag_view(self, context, fn):
+        """Run fn with the 3D view the drag started in as the context."""
+        area, region = _find_region(context.window, self._drag.area_ptr, self._drag.region_ptr)
+        if area is None:
+            return None
+        with context.temp_override(area=area, region=region):
+            return fn(region)
+
+    def _drag_event(self, context, event):
+        drag = self._drag
+
+        def mouse(region):
+            return event.mouse_x - region.x, event.mouse_y - region.y
+
+        try:
+            if event.type in {'MOUSEMOVE', 'INBETWEEN_MOUSEMOVE'} or event.type in MODIFIER_KEYS:
+                self._with_drag_view(context, lambda r: drag.update(context, event, *mouse(r)))
+                return {'RUNNING_MODAL'}
+            if event.type == 'LEFTMOUSE' and event.value == 'RELEASE':
+                if self._with_drag_view(context, lambda r: drag.finish(context, *mouse(r)) or True) is None:
+                    drag.cancel(context)
+                return self._end_drag(context)
+            if event.type in {'ESC', 'RIGHTMOUSE'} and event.value == 'PRESS':
+                self._with_drag_view(context, lambda r: drag.cancel(context))
+                return self._end_drag(context)
+        except Exception as exc:
+            print(f"GuideBro: ruler drag failed: {exc}")
+            return self._end_drag(context)
+        return {'RUNNING_MODAL'}
+
+    def _end_drag(self, context):
+        self._drag = None
+        context.window.cursor_modal_restore()
+        self._cursor = None
+        return {'RUNNING_MODAL'}
+
     def _record(self, context, x, y):
+        """Remember (and return) the 3D view WINDOW region under (x, y)."""
         win = context.window
         if win is None or win.screen is None:
-            return
+            return None
         for area in win.screen.areas:
             if area.type != 'VIEW_3D':
                 continue
@@ -146,8 +235,9 @@ class GUIDEBRO_OT_view_tracker(bpy.types.Operator):
                         and region.y <= y < region.y + region.height):
                     _pointer.update(window=win.as_pointer(), area=area.as_pointer(),
                                     region=region.as_pointer())
-                    return
-            return
+                    return area, region
+            return None
+        return None
 
 
 def _start_trackers():
@@ -156,7 +246,7 @@ def _start_trackers():
         for win in wm.windows:
             if win.as_pointer() in _trackers or win.scene is None:
                 continue
-            if not win.scene.guidebro.obj_snap:
+            if not _tracker_wanted(getattr(win.scene, "guidebro", None)):
                 continue
             with bpy.context.temp_override(window=win):
                 bpy.ops.guidebro.view_tracker('INVOKE_DEFAULT')
